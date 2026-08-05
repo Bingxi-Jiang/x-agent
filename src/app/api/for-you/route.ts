@@ -8,15 +8,29 @@ import { getForYouImportStatus, saveForYouImport } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-function extensionRequest(request: Request): boolean {
+function publicRequestOrigin(request: Request): string {
+  const forwardedHost = request.headers.get("X-Forwarded-Host")?.split(",")[0]?.trim();
+  const host = forwardedHost || request.headers.get("Host");
+  const forwardedProto = request.headers.get("X-Forwarded-Proto")?.split(",")[0]?.trim();
+  const protocol = forwardedProto || new URL(request.url).protocol.replace(":", "");
+  return host ? `${protocol}://${host}` : new URL(request.url).origin;
+}
+
+function trustedImportRequest(request: Request): boolean {
   const origin = request.headers.get("Origin");
-  return !origin || origin === new URL(request.url).origin || origin.startsWith("chrome-extension://");
+  return (
+    !origin ||
+    origin === new URL(request.url).origin ||
+    origin === publicRequestOrigin(request) ||
+    origin.startsWith("chrome-extension://") ||
+    request.headers.get("Sec-Fetch-Site") === "same-origin"
+  );
 }
 
 function corsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get("Origin");
   return {
-    "Access-Control-Allow-Origin": origin?.startsWith("chrome-extension://") ? origin : new URL(request.url).origin,
+    "Access-Control-Allow-Origin": origin && trustedImportRequest(request) ? origin : publicRequestOrigin(request),
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Content-Type, X-X-Agent-Token",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -66,7 +80,7 @@ function authorized(request: Request): boolean {
 }
 
 export async function OPTIONS(request: Request) {
-  if (!extensionRequest(request)) return new NextResponse(null, { status: 403 });
+  if (!trustedImportRequest(request)) return new NextResponse(null, { status: 403 });
   return new NextResponse(null, { status: 204, headers: corsHeaders(request) });
 }
 
@@ -76,7 +90,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    if (!extensionRequest(request)) {
+    if (!trustedImportRequest(request)) {
       return NextResponse.json({ error: "For You imports are accepted only from the X Agent browser extension." }, { status: 403 });
     }
     if (!authorized(request)) {
