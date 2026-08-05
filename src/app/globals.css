@@ -946,6 +946,50 @@ select {
   text-align: center;
 }
 
+.import-screen {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+}
+
+.import-card {
+  width: min(560px, 100%);
+  padding: 36px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 18px 50px rgba(35, 40, 33, 0.08);
+}
+
+.import-card h1 {
+  margin: 5px 0 18px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(34px, 7vw, 52px);
+  letter-spacing: -0.04em;
+}
+
+.import-message {
+  padding: 13px 15px;
+  border-radius: 8px;
+  background: var(--wash);
+}
+
+.import-message.success {
+  background: #e8f3ed;
+  color: var(--green);
+}
+
+.import-message.error {
+  background: #f8eae5;
+  color: #812e1a;
+}
+
+.import-help {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .spinner {
   width: 30px;
   height: 30px;

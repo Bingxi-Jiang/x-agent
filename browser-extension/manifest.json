@@ -17,6 +17,15 @@
       "matches": ["https://x.com/*", "https://twitter.com/*"],
       "js": ["content-script.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://*.app.github.dev/*"
+      ],
+      "js": ["import-bridge.js"],
+      "run_at": "document_idle"
     }
   ],
   "options_ui": {

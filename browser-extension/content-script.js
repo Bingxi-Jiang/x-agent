@@ -157,6 +157,8 @@
         updatePanel(chrome.runtime.lastError.message, "error");
       } else if (!response?.ok) {
         updatePanel(response?.error || "Could not reach X Agent.", "error");
+      } else if (response.handoff) {
+        updatePanel("X Agent opened in a new tab to securely finish the import.", "ok");
       } else {
         updatePanel(`${response.status.postCount} For You posts sent. You can return to X Agent.`, "ok");
       }

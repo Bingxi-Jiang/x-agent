@@ -70,7 +70,7 @@ For UI development without a captured feed, set `X_USE_FIXTURES=true`. Fixture m
 1. Start X Agent so the capture endpoint is available.
 2. Open `chrome://extensions` (or `edge://extensions`) and enable **Developer mode**.
 3. Select **Load unpacked** and choose the [`browser-extension`](browser-extension) directory. If the repository is in a remote Codespace, download that directory to your computer first.
-4. Open the extension's **Details → Extension options**. Keep `http://localhost:3000` when running locally, or enter the forwarded HTTPS URL when running in a Codespace. If `X_AGENT_IMPORT_TOKEN` is configured, enter the same token here.
+4. Open the extension's **Details → Extension options**. Keep `http://localhost:3000` when running locally, or enter the forwarded HTTPS URL when running in a Codespace. If `X_AGENT_IMPORT_TOKEN` is configured, enter the same token here. Private Codespaces use an authenticated browser-tab handoff instead of a cross-origin request.
 5. Visit [x.com/home](https://x.com/home), select **For You**, and browse or scroll. The bottom-right panel counts rendered posts. Select **Send posts to X Agent**, return to the app, and refresh the capture status.
 
 The extension sees only posts X renders while the **For You** tab is selected. It stores no X password or session cookie, calls no private X endpoint, and never publishes a reply.

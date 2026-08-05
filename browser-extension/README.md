@@ -14,7 +14,7 @@ This unpacked Chrome/Edge extension captures posts that X has actually rendered 
 
 1. Open [x.com/home](https://x.com/home) and select **For You**.
 2. Browse or scroll the feed. The bottom-right capture panel counts posts as X renders them.
-3. Select **Send posts to X Agent**.
+3. Select **Send posts to X Agent**. For a private Codespace, the extension opens an X Agent tab so GitHub can authenticate the import normally.
 4. Return to X Agent, refresh the feed status, and generate the batch.
 
 X Agent chooses the first 10 unseen, substantive technical posts in captured **For You** order. Browse farther and capture again when fewer than 10 eligible unseen posts are available.
