@@ -24,7 +24,6 @@ export interface ProviderSettings {
 export interface CredentialStatus {
   openai: boolean;
   claude: boolean;
-  x: boolean;
   fixtures: boolean;
 }
 
@@ -57,6 +56,14 @@ export interface CandidatePost {
   media: PostMedia[];
   category: TopicCategory;
   score: number;
+}
+
+export type CapturedForYouPost = Omit<CandidatePost, "category" | "score">;
+
+export interface ForYouImportStatus {
+  importId: number | null;
+  capturedAt: string | null;
+  postCount: number;
 }
 
 export interface Draft {
@@ -93,7 +100,7 @@ export interface Batch {
   completedAt: string | null;
   status: "generating" | "ready" | "reviewed" | "failed";
   providers: Provider[];
-  source: "x_api" | "fixtures";
+  source: "for_you" | "fixtures" | "x_api";
   voiceVersion: string;
   posts: BatchPost[];
 }

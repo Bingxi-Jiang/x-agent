@@ -7,7 +7,9 @@ import type {
   Batch,
   BatchPost,
   CandidatePost,
+  CapturedForYouPost,
   Draft,
+  ForYouImportStatus,
   Provider,
   ProviderSettings,
   ReviewInput,
@@ -43,6 +45,7 @@ const schema = `
     status TEXT NOT NULL CHECK (status IN ('generating', 'ready', 'reviewed', 'failed')),
     providers_json TEXT NOT NULL,
     source TEXT NOT NULL CHECK (source IN ('x_api', 'fixtures')),
+    feed_source TEXT CHECK (feed_source IS NULL OR feed_source = 'for_you'),
     voice_version TEXT NOT NULL
   );
 
@@ -92,6 +95,27 @@ const schema = `
     approved INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS for_you_imports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    captured_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS for_you_posts (
+    import_id INTEGER NOT NULL REFERENCES for_you_imports(id),
+    post_id TEXT NOT NULL,
+    feed_position INTEGER NOT NULL,
+    author_name TEXT NOT NULL,
+    username TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    metrics_json TEXT NOT NULL,
+    url TEXT NOT NULL,
+    media_json TEXT NOT NULL,
+    PRIMARY KEY (import_id, post_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS for_you_posts_import_idx ON for_you_posts(import_id, feed_position);
 `;
 
 function now(): string {
@@ -107,6 +131,10 @@ export function getDatabase(): DatabaseSync {
 
   const database = new DatabaseSync(filename);
   database.exec(schema);
+  const batchColumns = database.prepare("PRAGMA table_info(batches)").all() as { name: string }[];
+  if (!batchColumns.some((column) => column.name === "feed_source")) {
+    database.exec("ALTER TABLE batches ADD COLUMN feed_source TEXT");
+  }
   database
     .prepare(
       `INSERT OR IGNORE INTO settings
@@ -145,7 +173,7 @@ export function saveSettings(input: Pick<ProviderSettings, "useOpenAI" | "useCla
 export function createBatch(
   posts: CandidatePost[],
   providers: Provider[],
-  source: "x_api" | "fixtures",
+  source: Batch["source"],
   voiceVersion: string,
 ): number {
   const db = getDatabase();
@@ -153,10 +181,10 @@ export function createBatch(
   try {
     const result = db
       .prepare(
-        `INSERT INTO batches (created_at, status, providers_json, source, voice_version)
-         VALUES (?, 'generating', ?, ?, ?)`,
+        `INSERT INTO batches (created_at, status, providers_json, source, feed_source, voice_version)
+         VALUES (?, 'generating', ?, ?, ?, ?)`,
       )
-      .run(now(), JSON.stringify(providers), source, voiceVersion);
+      .run(now(), JSON.stringify(providers), source === "fixtures" ? "fixtures" : "x_api", source === "for_you" ? "for_you" : null, voiceVersion);
     const batchId = Number(result.lastInsertRowid);
     const insert = db.prepare(
       `INSERT INTO posts
@@ -268,7 +296,7 @@ export function getBatch(batchId: number): Batch | null {
     completedAt: row.completed_at === null ? null : String(row.completed_at),
     status: String(row.status) as Batch["status"],
     providers: JSON.parse(String(row.providers_json)),
-    source: String(row.source) as Batch["source"],
+    source: row.feed_source === "for_you" ? "for_you" : String(row.source) as Batch["source"],
     voiceVersion: String(row.voice_version),
     posts: getPostsForBatch(Number(row.id)),
   };
@@ -348,6 +376,79 @@ export function isBatchFullyReviewed(batchId: number): boolean {
 export function seenPostIds(): Set<string> {
   const rows = getDatabase().prepare("SELECT id FROM posts").all() as { id: string }[];
   return new Set(rows.map((row) => String(row.id)));
+}
+
+export function saveForYouImport(posts: CapturedForYouPost[], capturedAt = now()): ForYouImportStatus {
+  const db = getDatabase();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = db.prepare("INSERT INTO for_you_imports (captured_at) VALUES (?)").run(capturedAt);
+    const importId = Number(result.lastInsertRowid);
+    const insert = db.prepare(
+      `INSERT INTO for_you_posts
+       (import_id, post_id, feed_position, author_name, username, text, created_at, metrics_json, url, media_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const unique = new Set<string>();
+    let position = 0;
+    for (const post of posts) {
+      if (unique.has(post.id)) continue;
+      unique.add(post.id);
+      insert.run(
+        importId,
+        post.id,
+        position++,
+        post.authorName,
+        post.username,
+        post.text,
+        post.createdAt,
+        JSON.stringify(post.metrics),
+        post.url,
+        JSON.stringify(post.media),
+      );
+    }
+    db.exec("COMMIT");
+    return { importId, capturedAt, postCount: unique.size };
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+export function getForYouImportStatus(): ForYouImportStatus {
+  const row = getDatabase()
+    .prepare(
+      `SELECT for_you_imports.id, for_you_imports.captured_at, COUNT(for_you_posts.post_id) AS post_count
+       FROM for_you_imports
+       LEFT JOIN for_you_posts ON for_you_posts.import_id = for_you_imports.id
+       GROUP BY for_you_imports.id
+       ORDER BY for_you_imports.id DESC LIMIT 1`,
+    )
+    .get() as Record<string, SqlValue> | undefined;
+  if (!row) return { importId: null, capturedAt: null, postCount: 0 };
+  return {
+    importId: Number(row.id),
+    capturedAt: String(row.captured_at),
+    postCount: Number(row.post_count),
+  };
+}
+
+export function getLatestForYouPosts(): CapturedForYouPost[] {
+  const status = getForYouImportStatus();
+  if (status.importId === null) return [];
+  const rows = getDatabase()
+    .prepare("SELECT * FROM for_you_posts WHERE import_id = ? ORDER BY feed_position")
+    .all(status.importId) as Record<string, SqlValue>[];
+  return rows.map((row) => ({
+    id: String(row.post_id),
+    authorName: String(row.author_name),
+    username: String(row.username),
+    text: String(row.text),
+    createdAt: String(row.created_at),
+    metrics: JSON.parse(String(row.metrics_json)),
+    url: String(row.url),
+    media: JSON.parse(String(row.media_json)),
+  }));
 }
 
 export function insertVoiceRevision(

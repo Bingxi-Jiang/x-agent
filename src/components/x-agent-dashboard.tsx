@@ -8,6 +8,7 @@ import type {
   ComparisonStats,
   CredentialStatus,
   FeedbackCategory,
+  ForYouImportStatus,
   Provider,
   ProviderSettings,
   SavedReview,
@@ -56,6 +57,52 @@ function formatDate(value: string): string {
 function formatNumber(value: number | undefined): string {
   if (value === undefined) return "—";
   return new Intl.NumberFormat("en-US", { notation: value >= 1000 ? "compact" : "standard" }).format(value);
+}
+
+function batchSourceName(source: Batch["source"]): string {
+  if (source === "for_you") return "X FOR YOU FEED";
+  if (source === "fixtures") return "LOCAL FIXTURES";
+  return "LEGACY X SEARCH";
+}
+
+function ForYouSourcePanel({
+  status,
+  busy,
+  canReplace,
+  onRefresh,
+  onReplace,
+}: {
+  status: ForYouImportStatus;
+  busy: boolean;
+  canReplace: boolean;
+  onRefresh: () => Promise<void>;
+  onReplace: () => Promise<void>;
+}) {
+  return (
+    <section className="for-you-panel" aria-labelledby="for-you-title">
+      <div>
+        <p className="eyebrow">POST SOURCE</p>
+        <h2 id="for-you-title">Your X For You feed</h2>
+        <p>
+          Open X with the local capture extension, select <strong>For You</strong>, browse the feed, then send the posts shown there to X Agent.
+        </p>
+      </div>
+      <div className="for-you-status">
+        <strong>{status.postCount}</strong>
+        <span>posts in latest capture</span>
+        <small>{status.capturedAt ? `Captured ${formatDate(status.capturedAt)}` : "No feed captured yet"}</small>
+      </div>
+      <div className="for-you-actions">
+        <button className="button secondary" disabled={busy} onClick={onRefresh}>Refresh capture status</button>
+        {canReplace && (
+          <button className="button primary" disabled={busy || status.postCount === 0} onClick={onReplace}>
+            Replace current batch with For You
+          </button>
+        )}
+        <small>Extension folder: <code>browser-extension</code></small>
+      </div>
+    </section>
+  );
 }
 
 function ProviderSettingsPanel({
@@ -255,7 +302,19 @@ function ReviewCard({ post, index, busy, onSaved }: { post: BatchPost; index: nu
           <span>◈ {formatNumber(post.metrics.quotes)}</span>
           {post.metrics.impressions !== undefined && <span>◉ {formatNumber(post.metrics.impressions)}</span>}
         </div>
-        <a className="x-link" href={post.url} target="_blank" rel="noreferrer">Open original on X ↗</a>
+        <div className="x-actions">
+          <a className="x-link" href={post.url} target="_blank" rel="noreferrer">Open original on X ↗</a>
+          {editedReply.trim() && (
+            <a
+              className="x-link reply-link"
+              href={`https://x.com/intent/tweet?in_reply_to=${encodeURIComponent(post.id)}&text=${encodeURIComponent(editedReply.trim())}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Reply on X with this draft ↗
+            </a>
+          )}
+        </div>
       </div>
 
       <div className="review-column">
@@ -424,6 +483,7 @@ export function XAgentDashboard() {
   const [stats, setStats] = useState<ComparisonStats | null>(null);
   const [voice, setVoice] = useState<VoicePayload | null>(null);
   const [history, setHistory] = useState<(Batch & { stats: ComparisonStats })[]>([]);
+  const [forYou, setForYou] = useState<ForYouImportStatus>({ importId: null, capturedAt: null, postCount: 0 });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
@@ -438,14 +498,21 @@ export function XAgentDashboard() {
     const payload = await api<{ batches: (Batch & { stats: ComparisonStats })[] }>("/api/history");
     setHistory(payload.batches);
   }, []);
+  const loadForYou = useCallback(async () => setForYou(await api<ForYouImportStatus>("/api/for-you")), []);
 
   useEffect(() => {
-    Promise.all([api<SettingsPayload>("/api/settings"), api<VoicePayload>("/api/voice"), api<{ batch: Batch | null; stats: ComparisonStats }>("/api/batches/current")])
-      .then(([settingsPayload, voicePayload, batchPayload]) => {
+    Promise.all([
+      api<SettingsPayload>("/api/settings"),
+      api<VoicePayload>("/api/voice"),
+      api<{ batch: Batch | null; stats: ComparisonStats }>("/api/batches/current"),
+      api<ForYouImportStatus>("/api/for-you"),
+    ])
+      .then(([settingsPayload, voicePayload, batchPayload, forYouPayload]) => {
         setSettings(settingsPayload);
         setVoice(voicePayload);
         setBatch(batchPayload.batch);
         setStats(batchPayload.stats);
+        setForYou(forYouPayload);
       })
       .catch((error) => setNotice({ kind: "error", text: error instanceof Error ? error.message : "Could not load X Agent." }));
   }, []);
@@ -483,13 +550,31 @@ export function XAgentDashboard() {
     });
   }
 
-  async function generate() {
+  async function generate(replaceCurrent = false) {
     await withBusy(async () => {
-      const payload = await api<{ batch: Batch; stats: ComparisonStats }>("/api/batches/generate", { method: "POST" });
+      const payload = await api<{ batch: Batch; stats: ComparisonStats }>("/api/batches/generate", {
+        method: "POST",
+        body: JSON.stringify({ replaceCurrent }),
+      });
       setBatch(payload.batch);
       setStats(payload.stats);
-      setNotice({ kind: "success", text: `Batch ${payload.batch.id} generated with ${payload.batch.providers.map(providerName).join(" and ")}.` });
+      setNotice({
+        kind: "success",
+        text: `${replaceCurrent ? "Previous batch replaced. " : ""}Batch ${payload.batch.id} generated from ${batchSourceName(payload.batch.source)} with ${payload.batch.providers.map(providerName).join(" and ")}.`,
+      });
       setTab("review");
+    });
+  }
+
+  async function replaceWithForYou() {
+    if (!window.confirm("Replace the current unreviewed batch with a new batch from your latest For You capture?")) return;
+    await generate(true);
+  }
+
+  async function refreshForYou() {
+    await withBusy(async () => {
+      await loadForYou();
+      setNotice({ kind: "success", text: "For You capture status refreshed." });
     });
   }
 
@@ -563,6 +648,15 @@ export function XAgentDashboard() {
 
       {tab === "review" && (
         <>
+          {!settings.credentials.fixtures && (
+            <ForYouSourcePanel
+              status={forYou}
+              busy={busy}
+              canReplace={Boolean(batch?.status === "ready" && !fullyReviewed)}
+              onRefresh={refreshForYou}
+              onReplace={replaceWithForYou}
+            />
+          )}
           <ProviderSettingsPanel payload={settings} busy={busy} onSave={saveSettings} />
           {batch && <StatsStrip stats={stats} />}
 
@@ -570,15 +664,15 @@ export function XAgentDashboard() {
             <section className="empty-state">
               <span className="empty-index">01</span>
               <h2>Generate the first calibration batch</h2>
-              <p>X Agent will rank 10 technical posts and call only the providers enabled above.</p>
-              <button className="button primary large" disabled={busy} onClick={generate}>Generate first 10</button>
-              {!settings.credentials.x && !settings.credentials.fixtures && <p className="inline-warning">Add X_BEARER_TOKEN, or set X_USE_FIXTURES=true for local fixture mode.</p>}
+              <p>X Agent will use the first 10 unseen, substantive technical posts in your captured For You order.</p>
+              <button className="button primary large" disabled={busy || (!settings.credentials.fixtures && forYou.postCount === 0)} onClick={() => generate()}>Generate first 10</button>
+              {!settings.credentials.fixtures && forYou.postCount === 0 && <p className="inline-warning">Capture your For You feed with the browser extension first.</p>}
             </section>
           ) : (
             <section className="batch-section">
               <div className="section-heading batch-heading">
                 <div>
-                  <p className="eyebrow">BATCH {batch.id} · {batch.source === "fixtures" ? "LOCAL FIXTURES" : "OFFICIAL X API"}</p>
+                  <p className="eyebrow">BATCH {batch.id} · {batchSourceName(batch.source)}</p>
                   <h2>Review the current 10</h2>
                   <p>Generated with {batch.providers.map(providerName).join(" + ")} · voice version {batch.voiceVersion}</p>
                 </div>

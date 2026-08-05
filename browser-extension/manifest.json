@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "X Agent — For You Capture",
+  "version": "0.1.0",
+  "description": "Send posts visible in your X For You feed to your local X Agent workspace.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://*.app.github.dev/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "X Agent — For You Capture"
+  }
+}

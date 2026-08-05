@@ -13,7 +13,7 @@ import {
 import { buildReplyPrompt, readPersistentProfiles } from "@/lib/learning";
 import { callModel } from "@/lib/models";
 import type { Batch, CandidatePost, Provider } from "@/lib/types";
-import { fetchCandidatePosts, rankAndSelectPosts } from "@/lib/x-posts";
+import { fetchCandidatePosts, rankAndSelectPosts, selectForYouPosts } from "@/lib/x-posts";
 
 interface BatchDependencies {
   fetchPosts: typeof fetchCandidatePosts;
@@ -50,10 +50,13 @@ export async function generateBatchWithDependencies(dependencies: BatchDependenc
   providers.forEach(dependencies.assertCredential);
 
   const candidates = await dependencies.fetchPosts();
-  const posts = rankAndSelectPosts(candidates.posts, seenPostIds(), 10);
+  const seen = seenPostIds();
+  const posts = candidates.source === "for_you"
+    ? selectForYouPosts(candidates.posts, seen, 10)
+    : rankAndSelectPosts(candidates.posts, seen, 10);
   if (posts.length < 10) {
     throw new Error(
-      `Only ${posts.length} unseen, substantive posts were available. A batch requires 10; expand X search access or add fixture candidates.`,
+      `Only ${posts.length} unseen, substantive technical posts were available. A batch requires 10; browse farther in X's For You tab and capture the feed again.`,
     );
   }
 

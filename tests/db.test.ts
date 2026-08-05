@@ -55,3 +55,27 @@ test("historical drafts and feedback survive later provider changes", async () =
   assert.equal(historicalBatch.posts[0].review?.selectedSource, "claude");
   assert.equal(comparisonStats(historicalBatch).claude?.selected, 1);
 });
+
+test("latest For You capture persists in feed order and labels its batch source", async () => {
+  const db = await import("@/lib/db");
+  const makePost = (id: string, username: string) => ({
+    id,
+    authorName: username,
+    username,
+    text: `A substantive database architecture post from ${username} with enough detail to support a useful technical reply.`,
+    createdAt: new Date().toISOString(),
+    metrics: { likes: 10, reposts: 2, replies: 1, quotes: 0 },
+    url: `https://x.com/${username}/status/${id}`,
+    media: [],
+  });
+  const first = makePost("10001", "first_author");
+  const second = makePost("10002", "second_author");
+
+  const status = db.saveForYouImport([first, second, first], "2026-08-05T10:00:00.000Z");
+  assert.equal(status.postCount, 2);
+  assert.deepEqual(db.getLatestForYouPosts().map((post) => post.id), ["10001", "10002"]);
+
+  const candidate = { ...first, category: "software_engineering" as const, score: 10 };
+  const batchId = db.createBatch([candidate], ["openai"], "for_you", "voice-for-you");
+  assert.equal(db.getBatch(batchId)?.source, "for_you");
+});

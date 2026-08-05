@@ -17,7 +17,6 @@ export function credentialStatus(): CredentialStatus {
   return {
     openai: Boolean(process.env.OPENAI_API_KEY?.trim()),
     claude: Boolean(process.env.ANTHROPIC_API_KEY?.trim()),
-    x: Boolean(process.env.X_BEARER_TOKEN?.trim()),
     fixtures: process.env.X_USE_FIXTURES === "true",
   };
 }
