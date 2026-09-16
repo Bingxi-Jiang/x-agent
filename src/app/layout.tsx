@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "X Agent",
-  description: "Paul Jiang's local X reply voice-calibration workspace",
+  description: "A local, personal X reply voice-calibration workspace",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

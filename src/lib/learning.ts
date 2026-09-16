@@ -112,16 +112,16 @@ export function summarizeFeedbackPatterns(): string {
   ].join("\n");
 }
 
-export async function readPersistentProfiles(): Promise<{ paulProfile: string; voiceProfile: string }> {
-  const [paulProfile, voiceProfile] = await Promise.all([
-    readFile(path.join(process.cwd(), "data", "paul-profile.md"), "utf8"),
-    readFile(path.join(process.cwd(), "data", "pj-voice.md"), "utf8"),
+export async function readPersistentProfiles(): Promise<{ identityProfile: string; voiceProfile: string }> {
+  const [identityProfile, voiceProfile] = await Promise.all([
+    readFile(path.join(process.cwd(), "data", "identity-profile.md"), "utf8"),
+    readFile(path.join(process.cwd(), "data", "voice-profile.md"), "utf8"),
   ]);
-  return { paulProfile, voiceProfile };
+  return { identityProfile, voiceProfile };
 }
 
 export async function buildReplyPrompt(post: CandidatePost): Promise<{ system: string; user: string }> {
-  const { paulProfile, voiceProfile } = await readPersistentProfiles();
+  const { identityProfile, voiceProfile } = await readPersistentProfiles();
   const examples = retrieveRelevantExamples(post.text, 4);
   const patterns = summarizeFeedbackPatterns();
   const exampleText = examples.length
@@ -134,7 +134,7 @@ export async function buildReplyPrompt(post: CandidatePost): Promise<{ system: s
     : "No relevant reviewed examples yet.";
 
   return {
-    system: `You write one possible public X reply in Paul Jiang's voice. This is context-based generation, not fine-tuning.\n\n${paulProfile}\n\n${voiceProfile}\n\nHard requirements:\n- Output only the reply, with no label or quotation marks.\n- Use natural English only and remain concise enough for an X reply.\n- Add a concrete idea, distinction, implication, or opinion.\n- Never fabricate Paul's firsthand experience.\n- Do not use corporate hype, empty agreement, or a generic closing question.`,
+    system: `You write one possible public X reply in the user's configured voice. This is context-based generation, not fine-tuning.\n\n${identityProfile}\n\n${voiceProfile}\n\nHard requirements:\n- Output only the reply, with no label or quotation marks.\n- Use natural English only and remain concise enough for an X reply.\n- Add a concrete idea, distinction, implication, or opinion.\n- Never fabricate the user's firsthand experience.\n- Do not use corporate hype, empty agreement, or a generic closing question.`,
     user: `Original X post by ${post.authorName} (@${post.username}):\n${post.text}\n\nEngagement context: ${post.metrics.likes} likes, ${post.metrics.reposts} reposts, ${post.metrics.replies} replies, ${post.metrics.quotes} quotes.\nTopic: ${post.category === "ai_ml" ? "AI / ML" : "software engineering"}.\n\nRelevant reviewed examples (small retrieved set only):\n${exampleText}\n\nRelevant feedback patterns:\n${patterns}\n\nWrite one reply.`,
   };
 }

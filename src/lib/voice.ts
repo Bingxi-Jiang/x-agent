@@ -24,7 +24,7 @@ const updateSchema = z.object({
 });
 
 function voiceFile(): string {
-  return path.join(process.cwd(), "data", "pj-voice.md");
+  return path.join(process.cwd(), "data", "voice-profile.md");
 }
 
 function revisionDirectory(): string {
@@ -102,14 +102,14 @@ export async function updateVoiceFromBatch(batchId: number): Promise<{
 }> {
   const batch = getBatch(batchId);
   if (!batch) throw new Error("Batch not found.");
-  if (!isBatchFullyReviewed(batchId)) throw new Error("Review every post in the current batch before updating PJ Voice.");
+  if (!isBatchFullyReviewed(batchId)) throw new Error("Review every post in the current batch before updating the voice profile.");
 
   const provider = getSettings().voiceUpdateProvider;
   assertVoiceProviderAvailable(provider);
   const previous = await readVoiceProfile();
   const evidence = batchEvidence(batchId);
   const system = `You revise a persistent writing-style profile from a completed feedback batch. This is instruction/profile revision, not model fine-tuning. Return only JSON with keys meaningfulChange (boolean), changeSummary (a concise user-facing sentence or short paragraph), and profileMarkdown (the complete updated profile). Preserve useful existing rules. Do not convert an isolated edit into a stable rule. Keep separate Markdown sections for Stable preferences, Newly observed preferences, Topic-specific preferences, Uncertain patterns, Rejected wording and habits, Opinion strength and reasoning, Topic preferences, and Representative examples. If evidence shows no meaningful pattern, set meaningfulChange false, explain why, and return the prior profile unchanged.`;
-  const user = `Previous PJ voice profile:\n\n${previous}\n\nCompleted batch feedback (${batch.posts.length} items only):\n\n${evidence}\n\nCompare drafts, selections, edits, replacements, no-reply decisions, ratings, and written feedback. Update only for meaningful patterns.`;
+  const user = `Previous voice profile:\n\n${previous}\n\nCompleted batch feedback (${batch.posts.length} items only):\n\n${evidence}\n\nCompare drafts, selections, edits, replacements, no-reply decisions, ratings, and written feedback. Update only for meaningful patterns.`;
   const raw = await callModel(provider, system, user, 2600);
   const result = updateSchema.parse(parseModelJson(raw));
 
@@ -131,9 +131,9 @@ export async function saveManualVoiceProfile(content: string): Promise<{ summary
   if (current.trim() === normalized) {
     return { summary: "No changes were made to the voice profile.", version: await voiceProfileVersion() };
   }
-  await archiveCurrent("Profile before Paul's manual edit.");
+  await archiveCurrent("Profile before the user's manual edit.");
   await writeFile(voiceFile(), `${normalized}\n`, "utf8");
-  return { summary: "Paul’s manual voice-profile edit was saved.", version: await voiceProfileVersion() };
+  return { summary: "The manual voice-profile edit was saved.", version: await voiceProfileVersion() };
 }
 
 export async function restoreVoiceProfile(revisionId: number): Promise<{ summary: string; version: string }> {
@@ -148,7 +148,7 @@ export async function approveCurrentVoiceProfile(): Promise<VoiceRevision> {
   const content = await readVoiceProfile();
   const revision = await archiveContent(
     content,
-    "Approved by Paul as the current calibrated voice.",
+    "Approved by the user as the current calibrated voice.",
     "approved",
     true,
   );

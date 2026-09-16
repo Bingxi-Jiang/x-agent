@@ -10,7 +10,7 @@ export async function POST() {
     const revision = await approveCurrentVoiceProfile();
     return NextResponse.json({
       revision,
-      message: "PJ Voice is approved. X Agent is ready for a later live-operation phase; nothing was published.",
+      message: "The voice profile is approved. X Agent is ready for a later live-operation phase; nothing was published.",
     });
   } catch (error) {
     return apiError(error);

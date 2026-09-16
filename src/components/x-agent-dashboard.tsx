@@ -181,7 +181,7 @@ function ProviderSettingsPanel({
       </label>
       {(!voiceEnabled || !voiceCredential) && (
         <p className="inline-warning">
-          Select an enabled provider with credentials before updating PJ Voice.
+          Select an enabled provider with credentials before updating the voice profile.
         </p>
       )}
       <p className="settings-note">
@@ -369,7 +369,7 @@ function ReviewCard({ post, index, busy, onSaved }: { post: BatchPost; index: nu
         </div>
 
         <label className="field">
-          <span>Paul’s replacement response</span>
+          <span>Your replacement response</span>
           <textarea rows={2} value={replacementReply} onChange={(event) => setReplacementReply(event.target.value)} placeholder="Optional: write the response you would actually use." />
         </label>
         <label className="field">
@@ -406,7 +406,7 @@ function VoiceWorkspace({
       <div className="section-heading">
         <div>
           <p className="eyebrow">PERSISTENT CONTEXT · VERSION {voice.version}</p>
-          <h2>Current PJ voice</h2>
+          <h2>Current voice profile</h2>
           <p>This file guides both providers. Saving or restoring archives the version it replaces.</p>
         </div>
         {voice.calibrationComplete && <span className="approved-badge">Approved voice</span>}
@@ -588,7 +588,7 @@ export function XAgentDashboard() {
       setBatch(payload.batch);
       setStats(payload.stats);
       await Promise.all([loadVoice(), loadHistory()]);
-      setNotice({ kind: "success", text: `PJ Voice ${payload.voice.changed ? "updated" : "kept unchanged"}: ${payload.voice.summary}` });
+      setNotice({ kind: "success", text: `Voice profile ${payload.voice.changed ? "updated" : "kept unchanged"}: ${payload.voice.summary}` });
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
@@ -625,7 +625,7 @@ export function XAgentDashboard() {
     <main className="shell">
       <header className="hero app-hero">
         <div>
-          <p className="eyebrow">PAUL JIANG’S LOCAL CALIBRATION WORKSPACE</p>
+          <p className="eyebrow">YOUR LOCAL CALIBRATION WORKSPACE</p>
           <h1>X Agent</h1>
           <p>Compare model drafts, teach a persistent public voice, and keep publishing out of the loop.</p>
         </div>
@@ -638,7 +638,7 @@ export function XAgentDashboard() {
       <nav className="tabs" aria-label="X Agent sections">
         {(["review", "voice", "history"] as Tab[]).map((item) => (
           <button className={tab === item ? "active" : ""} onClick={() => setTab(item)} key={item}>
-            {item === "review" ? "Calibration" : item === "voice" ? "PJ Voice" : "History"}
+            {item === "review" ? "Calibration" : item === "voice" ? "Voice Profile" : "History"}
           </button>
         ))}
       </nav>
@@ -687,7 +687,7 @@ export function XAgentDashboard() {
                   <p>The voice updater uses only this completed batch plus the persistent profile—not the entire feedback database.</p>
                 </div>
                 <button className="button primary large" disabled={busy || !fullyReviewed || !updateProviderAvailable} onClick={updateVoiceAndNext}>
-                  Update PJ Voice and Generate Next 10
+                  Update Voice Profile and Generate Next 10
                 </button>
                 {fullyReviewed && !updateProviderAvailable && <p className="inline-warning">Choose an enabled, credentialed voice-update provider above.</p>}
               </div>

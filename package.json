@@ -2,7 +2,7 @@
   "name": "x-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "A local For You feed reply and voice-calibration agent for Paul Jiang",
+  "description": "A local, personal X reply and voice-calibration agent",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
