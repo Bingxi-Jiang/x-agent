@@ -1,11 +1,12 @@
 node_modules/
 .next/
 out/
-.env
-.env.local
-.env.*.local
+# Local secrets and environment overrides. Keep only the empty public template.
+.env*
+!.env.example
 data/*.db
 data/*.db-*
+data/voice-revisions/
 *.log
 *.tsbuildinfo
 .DS_Store
